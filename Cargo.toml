@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 description = "Intel: Management Absent - inspect and deblob Intel ME/TXE/CSME and AMD PSP management firmware"
 license = "GPL-3.0-or-later"
+repository = "https://github.com/seuros/intel_ma"
+readme = "README.md"
+keywords = ["intel-me", "firmware", "coreboot", "me-cleaner", "psp"]
+categories = ["command-line-utilities", "hardware-support"]
 
 # Keep the cloned reference crates out of our build/lint scope.
 [workspace]
