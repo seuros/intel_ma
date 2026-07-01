@@ -15,7 +15,7 @@ Supported:
 
 - Image detection: ME/TXE region images and full SPI dumps (Intel Flash Descriptor)
 - `$FPT` partition table parsing; FTPR/CODE location; IFWI `$CPD` discovery
-- Generations 1-7 (ME 6-10 AltMeDisable, CSME 11+ HAP, TXE, SPS)
+- Generations 1-7: ME 6 Ignition, ME 6-10 (AltMeDisable), CSME 11-16 (HAP), plus TXE and SPS variants
 - Partition removal with white/blacklist, FPT checksum repair, EFFS flag clear
 - Module removal: gen2 (`$MME`, LLUT/Huffman) and gen3 (`$CPD`)
 - FTPR relocation (`-r`) and truncation (`-t`)
