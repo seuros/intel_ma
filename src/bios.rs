@@ -23,6 +23,47 @@ pub struct Volume {
     pub files: usize,
 }
 
+/// A legacy PCI option ROM (`55 AA` + `PCIR`), e.g. a video BIOS. Mostly found
+/// after decompression - the blobs UEFIExtract writes as `body.bin`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OptionRom {
+    pub vendor: u16,
+    pub device: u16,
+    /// PCI class code (3 bytes); `0x03xxxx` is a display controller.
+    pub class: u32,
+    pub size: usize,
+    /// ROM image bytes, captured for extraction.
+    pub data: Vec<u8>,
+}
+
+impl OptionRom {
+    pub fn is_display(&self) -> bool {
+        self.class >> 16 == 0x03
+    }
+
+    pub fn vendor_name(&self) -> &'static str {
+        match self.vendor {
+            0x8086 => "Intel",
+            0x10de => "NVIDIA",
+            0x1002 => "AMD/ATI",
+            0x1106 => "VIA",
+            0x1af4 => "Red Hat",
+            _ => "unknown",
+        }
+    }
+
+    /// Extraction filename stem, e.g. `vgabios_amd-ati_1002_67df`.
+    pub fn file_stem(&self) -> String {
+        let kind = if self.is_display() {
+            "vgabios"
+        } else {
+            "optionrom"
+        };
+        let vendor = self.vendor_name().to_ascii_lowercase().replace('/', "-");
+        format!("{kind}_{vendor}_{:04x}_{:04x}", self.vendor, self.device)
+    }
+}
+
 /// BIOS vendor signature strings, checked against raw and decompressed content.
 const VENDOR_MARKERS: &[(&[u8], &str)] = &[
     (b"InsydeH2O", "Insyde H2O"),
@@ -59,6 +100,8 @@ pub struct BiosImage {
     pub lzma_sections: usize,
     /// UI-name strings (section type 0x15).
     pub names: Vec<String>,
+    /// Legacy PCI option ROMs found in raw and decompressed content.
+    pub option_roms: Vec<OptionRom>,
 }
 
 struct Ctx<'a> {
@@ -236,7 +279,39 @@ fn guid_section(ctx: &mut Ctx, sec_start: usize, content: usize, sec_end: usize,
 fn record_decompressed(ctx: &mut Ctx, data: &[u8], depth: usize) {
     ctx.img.decompressed_sections += 1;
     ctx.img.decompressed_bytes += data.len();
+    scan_option_roms(data, &mut ctx.img.option_roms);
     walk_owned_sections(ctx, data, depth + 1);
+}
+
+/// Scan `data` for legacy PCI option ROMs: a `55 AA` header whose PCI Data
+/// pointer (+0x18) lands on a `PCIR` block. New hits are appended, deduped.
+fn scan_option_roms(data: &[u8], out: &mut Vec<OptionRom>) {
+    let mut i = 0;
+    while i + 0x1a <= data.len() {
+        if data[i] != 0x55 || data[i + 1] != 0xaa {
+            i += 1;
+            continue;
+        }
+        let pcir = i + u16_le(data, i + 0x18) as usize;
+        if pcir + 0x10 <= data.len() && &data[pcir..pcir + 4] == b"PCIR" {
+            let mut size = data[i + 2] as usize * 512;
+            if size == 0 {
+                size = u16_le(data, pcir + 0x10) as usize * 512;
+            }
+            let end = (i + size).min(data.len());
+            let rom = OptionRom {
+                vendor: u16_le(data, pcir + 4),
+                device: u16_le(data, pcir + 6),
+                class: u24(data, pcir + 0x0d) as u32,
+                size,
+                data: data[i..end].to_vec(),
+            };
+            if !out.contains(&rom) {
+                out.push(rom);
+            }
+        }
+        i += 512; // option ROMs are 512-aligned
+    }
 }
 
 /// Walk sections in an owned (decompressed) buffer.
@@ -304,5 +379,7 @@ pub fn parse(buf: &[u8]) -> BiosImage {
     if ctx.img.vendor.is_none() {
         ctx.img.vendor = detect_vendor(buf);
     }
+    // Catch uncompressed / CSM option ROMs in the raw image.
+    scan_option_roms(buf, &mut ctx.img.option_roms);
     ctx.img
 }

@@ -30,13 +30,25 @@ enum Command {
     #[command(about = lingo::AMD_ABOUT)]
     Amd(InfoArgs),
     #[command(about = lingo::BIOS_ABOUT)]
-    Bios(InfoArgs),
+    Bios(BiosArgs),
+    #[command(about = lingo::GBE_ABOUT)]
+    Gbe(InfoArgs),
 }
 
 #[derive(Args)]
 struct InfoArgs {
     /// ME/TXE image or full SPI dump.
     file: PathBuf,
+}
+
+#[derive(Args)]
+struct BiosArgs {
+    /// ME/TXE image or full SPI dump.
+    file: PathBuf,
+
+    /// Write any PCI option ROMs (video BIOS, ...) found to this directory.
+    #[arg(long = "extract-roms", value_name = "DIR")]
+    extract_roms: Option<PathBuf>,
 }
 
 #[derive(Args)]
@@ -102,7 +114,8 @@ fn main() -> ExitCode {
         Command::Fit(a) => run_fit(&a.file),
         Command::Locks(a) => run_locks(&a.file),
         Command::Amd(a) => run_amd(&a.file),
-        Command::Bios(a) => run_bios(&a.file),
+        Command::Bios(a) => run_bios(&a.file, a.extract_roms.as_deref()),
+        Command::Gbe(a) => run_gbe(&a.file),
     };
 
     match result {
@@ -273,7 +286,7 @@ fn run_fit(path: &Path) -> intel_ma::Result<()> {
     Ok(())
 }
 
-fn run_bios(path: &Path) -> intel_ma::Result<()> {
+fn run_bios(path: &Path, extract_roms: Option<&Path>) -> intel_ma::Result<()> {
     let buf = std::fs::read(path)?;
     let img = intel_ma::bios::parse(&buf);
 
@@ -282,6 +295,8 @@ fn run_bios(path: &Path) -> intel_ma::Result<()> {
             Some(v) => println!("No UEFI firmware volumes; vendor: {v}"),
             None => println!("No UEFI firmware volumes found in this image"),
         }
+        print_option_roms(&img.option_roms);
+        extract_option_roms(&img.option_roms, extract_roms)?;
         return Ok(());
     }
 
@@ -312,7 +327,125 @@ fn run_bios(path: &Path) -> intel_ma::Result<()> {
             println!("  ... and {} more", names.len() - 24);
         }
     }
+    print_option_roms(&img.option_roms);
+    extract_option_roms(&img.option_roms, extract_roms)?;
     Ok(())
+}
+
+fn print_option_roms(roms: &[intel_ma::bios::OptionRom]) {
+    if roms.is_empty() {
+        return;
+    }
+    println!("{} PCI option ROM(s):", roms.len());
+    for r in roms {
+        let kind = if r.is_display() { " [video BIOS]" } else { "" };
+        println!(
+            "  {:04x}:{:04x} {} {} bytes{}",
+            r.vendor,
+            r.device,
+            r.vendor_name(),
+            r.size,
+            kind
+        );
+    }
+}
+
+/// Write each option ROM to `dir`, disambiguating same-ID ROMs with an index.
+fn extract_option_roms(
+    roms: &[intel_ma::bios::OptionRom],
+    dir: Option<&Path>,
+) -> intel_ma::Result<()> {
+    let Some(dir) = dir else { return Ok(()) };
+    if roms.is_empty() {
+        return Ok(());
+    }
+    std::fs::create_dir_all(dir)?;
+    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for r in roms {
+        let stem = r.file_stem();
+        let n = seen.entry(stem.clone()).or_insert(0);
+        let name = if *n == 0 {
+            format!("{stem}.rom")
+        } else {
+            format!("{stem}_{n}.rom")
+        };
+        *n += 1;
+        let path = dir.join(&name);
+        std::fs::write(&path, &r.data)?;
+        println!("  extracted {} ({} bytes)", path.display(), r.data.len());
+    }
+    Ok(())
+}
+
+fn run_gbe(path: &Path) -> intel_ma::Result<()> {
+    use intel_ma::descriptor::{self, Descriptor};
+
+    let buf = std::fs::read(path)?;
+    let sig = descriptor::FD_SIGNATURE;
+    let sig_at_zero = buf.get(0..4) == Some(&sig);
+    let has_fd = sig_at_zero || buf.get(0x10..0x14) == Some(&sig);
+
+    // Full dump carries the region in its descriptor; an ifdtool-extracted
+    // flashregion_3_gbe.bin is the bare region itself.
+    let (region_start, region): (usize, &[u8]) = if has_fd {
+        let d = Descriptor::parse(&buf, sig_at_zero);
+        if d.gbe.is_empty() || d.gbe.end > buf.len() {
+            println!("No GbE region in this descriptor (platform has no Intel LAN)");
+            return Ok(());
+        }
+        (d.gbe.start, d.gbe.all(&buf))
+    } else {
+        (0, &buf[..])
+    };
+
+    let Some(gbe) = intel_ma::gbe::parse(region) else {
+        println!("GbE region @ {region_start:#x} is too small to parse");
+        return Ok(());
+    };
+
+    println!(
+        "GbE region @ {:#x} ({:#x} B, {} bank{})",
+        region_start,
+        gbe.size,
+        gbe.banks.len(),
+        if gbe.banks.len() == 1 { "" } else { "s" }
+    );
+    for (i, b) in gbe.banks.iter().enumerate() {
+        let active = if gbe.active == Some(i) {
+            " (active)"
+        } else {
+            ""
+        };
+        let cksum = if b.checksum_valid { "OK" } else { "INVALID" };
+        let mac = if b.mac_blank() {
+            "blank".to_string()
+        } else if b.mac_default() {
+            format!("{} (Intel default)", fmt_mac(&b.mac))
+        } else {
+            fmt_mac(&b.mac)
+        };
+        println!("  bank {i}{active}: checksum {cksum}");
+        println!("    MAC:        {mac}");
+        match b.controller() {
+            Some(name) => println!("    controller: 8086:{:04x} ({name})", b.device_id),
+            None => println!("    controller: 8086:{:04x} (unknown)", b.device_id),
+        }
+        println!(
+            "    subsystem:  {:04x}:{:04x}",
+            b.subsystem_vendor, b.subsystem_device
+        );
+    }
+    if gbe.active.is_none() {
+        println!("warning: no bank has a valid checksum - NIC may not initialize");
+    }
+    Ok(())
+}
+
+fn fmt_mac(mac: &[u8; 6]) -> String {
+    mac.iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<Vec<_>>()
+        .join(":")
 }
 
 fn run_amd(path: &Path) -> intel_ma::Result<()> {

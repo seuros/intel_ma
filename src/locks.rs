@@ -219,6 +219,7 @@ mod tests {
             fd: Region::new(0, 0x1000),
             bios: Region::new(0, 0),
             me: Region::new(0, 0),
+            gbe: Region::new(0, 0),
         };
         let r = LockReport::scan(&buf, Some(&d), Some(3));
         let flm = r.descriptor.expect("descriptor decoded");

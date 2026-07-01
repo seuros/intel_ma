@@ -32,7 +32,12 @@ Supported:
   `$PSP`/`$BHD` directories (bootloader, public key, SMU, ABL, APCB/APOB, ...).
   The PSP is on-die and fuse-enforced, so this side is inspect-only
 - **BIOS region** (`bios`) - walk UEFI firmware volumes and FFS files, listing
-  modules; decompresses EFI/Tiano and LZMA sections via the `efi-compress` crate
+  modules; decompresses EFI/Tiano and LZMA sections via the `efi-compress` crate.
+  Detects legacy PCI option ROMs (video BIOS) and can extract them with
+  `--extract-roms <dir>`
+- **GbE region** (`gbe`) - the Intel LAN NVM: MAC address, per-bank checksum and
+  the active bank, and the LAN controller model (I217/I218/I219, 82577/82579).
+  Accepts a full dump or a bare `flashregion_3_gbe.bin`
 
 ## Usage
 
@@ -54,6 +59,12 @@ intel_ma amd firmware.bin
 
 # Walk the BIOS region: UEFI volumes, modules (decompresses EFI/Tiano + LZMA)
 intel_ma bios firmware.bin
+
+# Extract any PCI option ROMs / video BIOS to a directory
+intel_ma bios firmware.bin --extract-roms ./roms
+
+# Read the GbE region: MAC, LAN controller, NVM banks
+intel_ma gbe firmware.bin
 
 # Strip and neuter the ME. Writes in place unless -O is given.
 intel_ma clean firmware.bin -O cleaned.bin

@@ -21,6 +21,19 @@ pub fn start_end_to_flreg(start: usize, end: usize) -> u32 {
     (start & 0x7fff000) >> 12 | ((end - 1) & 0x7fff000) << 4
 }
 
+/// Decode an optional FLREG (regions 3+); empty `Region` when unused
+/// (base > limit, or all-zero / all-ones).
+fn optional_region(flreg: u32) -> Region {
+    let base = flreg & 0x7fff;
+    let limit = (flreg >> 16) & 0x7fff;
+    if flreg == 0 || flreg == 0xffffffff || limit < base {
+        Region::new(0, 0)
+    } else {
+        let (s, e) = flreg_to_start_end(flreg);
+        Region::new(s, e)
+    }
+}
+
 /// Parsed descriptor layout. `fpsba` = soft-strap base (== `fisba` for gen 2+).
 #[derive(Debug, Clone, Copy)]
 pub struct Descriptor {
@@ -32,6 +45,8 @@ pub struct Descriptor {
     pub fd: Region,
     pub bios: Region,
     pub me: Region,
+    /// GbE (LAN NVM) region 3; empty when the platform has no GbE.
+    pub gbe: Region,
 }
 
 impl Descriptor {
@@ -53,6 +68,7 @@ impl Descriptor {
         let flreg0 = rd(frba);
         let flreg1 = rd(frba + 4);
         let flreg2 = rd(frba + 8);
+        let flreg3 = rd(frba + 12);
 
         let (fd_s, fd_e) = flreg_to_start_end(flreg0);
         let (bios_s, bios_e) = flreg_to_start_end(flreg1);
@@ -67,6 +83,7 @@ impl Descriptor {
             fd: Region::new(fd_s, fd_e),
             bios: Region::new(bios_s, bios_e),
             me: Region::new(me_s, me_e),
+            gbe: optional_region(flreg3),
         }
     }
 }

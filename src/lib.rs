@@ -8,6 +8,7 @@ pub mod descriptor;
 pub mod error;
 pub mod fit;
 pub mod fpt;
+pub mod gbe;
 pub mod locks;
 pub mod manifest;
 pub mod modules;

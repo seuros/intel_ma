@@ -255,3 +255,56 @@ fn analyze_detects_full_image() {
     assert!(a.full_image);
     assert!(a.me_disabled);
 }
+
+/// One 128-byte GbE NVM bank with word 0x3f fixed so the 64 words sum to 0xbaba.
+fn gbe_bank(mac: [u8; 6], device_id: u16) -> [u8; 0x80] {
+    let mut b = [0u8; 0x80];
+    b[0..6].copy_from_slice(&mac);
+    b[0x1a..0x1c].copy_from_slice(&device_id.to_le_bytes()); // word 0x0d
+    let partial: u16 = (0..0x3f)
+        .map(|w| u16::from_le_bytes([b[w * 2], b[w * 2 + 1]]))
+        .fold(0u16, |a, w| a.wrapping_add(w));
+    let fixup = 0xbabau16.wrapping_sub(partial);
+    b[0x7e..0x80].copy_from_slice(&fixup.to_le_bytes());
+    b
+}
+
+#[test]
+fn gbe_parses_mac_controller_and_active_bank() {
+    let mut region = vec![0u8; 0x2000];
+    let mac = [0xc0, 0x3f, 0xd5, 0x64, 0x09, 0x82];
+    region[0..0x80].copy_from_slice(&gbe_bank(mac, 0x1559));
+
+    let gbe = intel_ma::gbe::parse(&region).expect("gbe parse");
+    assert_eq!(gbe.banks.len(), 2);
+    assert_eq!(gbe.active, Some(0));
+    assert!(gbe.banks[0].checksum_valid);
+    assert!(!gbe.banks[1].checksum_valid);
+    assert_eq!(gbe.banks[0].mac, mac);
+    assert_eq!(gbe.banks[0].device_id, 0x1559);
+    assert_eq!(gbe.banks[0].controller(), Some("I218-V"));
+}
+
+#[test]
+fn bios_scan_finds_option_rom() {
+    let mut buf = vec![0u8; 0x400];
+    buf[0] = 0x55;
+    buf[1] = 0xaa;
+    buf[2] = 2; // 2 * 512 = 1024 bytes
+    buf[0x18..0x1a].copy_from_slice(&0x20u16.to_le_bytes());
+    buf[0x20..0x24].copy_from_slice(b"PCIR");
+    buf[0x24..0x26].copy_from_slice(&0x10deu16.to_le_bytes()); // NVIDIA
+    buf[0x26..0x28].copy_from_slice(&0x0ffcu16.to_le_bytes());
+    buf[0x2d..0x30].copy_from_slice(&[0x00, 0x00, 0x03]); // display class
+
+    let img = intel_ma::bios::parse(&buf);
+    assert_eq!(img.option_roms.len(), 1);
+    let r = &img.option_roms[0];
+    assert_eq!((r.vendor, r.device), (0x10de, 0x0ffc));
+    assert_eq!(r.size, 1024);
+    assert!(r.is_display());
+    assert_eq!(r.vendor_name(), "NVIDIA");
+    assert_eq!(r.data.len(), 1024);
+    assert_eq!(&r.data[..2], &[0x55, 0xaa]);
+    assert_eq!(r.file_stem(), "vgabios_nvidia_10de_0ffc");
+}
