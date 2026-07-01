@@ -96,9 +96,9 @@ pub struct Fit {
 /// Mask translating the memory-mapped FIT pointer to a file offset.
 fn mapping_for(size: usize) -> usize {
     match size {
-        0x80_0000 => 0x7f_ffff,    // 8 MiB
-        0x100_0000 => 0xff_ffff,   // 16 MiB
-        0x200_0000 => 0x1ff_ffff,  // 32 MiB
+        0x80_0000 => 0x7f_ffff,   // 8 MiB
+        0x100_0000 => 0xff_ffff,  // 16 MiB
+        0x200_0000 => 0x1ff_ffff, // 32 MiB
         _ => 0xff_ffff,
     }
 }

@@ -28,7 +28,11 @@ fn get_chunks_offsets(llut: &[u8]) -> Vec<[u32; 2]> {
 
     for i in 0..chunk_count {
         let chunk = &llut[0x40 + i * 4..0x44 + i * 4];
-        let offset = if chunk[3] != 0x80 { u24_le(chunk, 0) } else { 0 };
+        let offset = if chunk[3] != 0x80 {
+            u24_le(chunk, 0)
+        } else {
+            0
+        };
         offsets.push([offset, 0]);
         if offset != 0 {
             nonzero.push(offset);
@@ -64,8 +68,7 @@ fn remove_modules(
 
     for mh in mod_headers {
         let name = ascii_trim(&mh[0x04..0x14]);
-        let offset =
-            u32_le(mh, 0x38) as usize + ftpr_offset;
+        let offset = u32_le(mh, 0x38) as usize + ftpr_offset;
         let size = u32_le(mh, 0x40) as usize;
         let flags = u32_le(mh, 0x50);
         let comp_type = (flags >> 4) & 7;
@@ -86,12 +89,9 @@ fn remove_modules(
                         return Err(Error::MissingLlut);
                     }
                     let head = me.read(buf, offset, 0x40)?.to_vec();
-                    let chunk_count =
-                        u32_le(&head, 0x4) as usize;
-                    base = u32_le(&head, 0x8)
-                        .wrapping_add(0x10000000);
-                    chunk_size =
-                        u32_le(&head, 0x30);
+                    let chunk_count = u32_le(&head, 0x4) as usize;
+                    base = u32_le(&head, 0x8).wrapping_add(0x10000000);
+                    chunk_size = u32_le(&head, 0x30);
                     let mut llut = head;
                     llut.extend_from_slice(me.read(buf, offset + 0x40, chunk_count * 4)?);
                     chunks_offsets = get_chunks_offsets(&llut);
@@ -148,8 +148,7 @@ pub fn relocate_partition(
     for mh in mod_headers {
         let flags = u32_le(mh, 0x50);
         if (flags >> 4) & 7 == 0x01 {
-            llut_start =
-                u32_le(mh, 0x38) as usize + old_offset;
+            llut_start = u32_le(mh, 0x38) as usize + old_offset;
             break;
         }
     }
@@ -157,8 +156,7 @@ pub fn relocate_partition(
     let mut lut_start_corr: u16 = 0;
     if !mod_headers.is_empty() && llut_start != 0 {
         lut_start_corr = me.read_u16(buf, llut_start + 0x9)?;
-        let min_new =
-            lut_start_corr as i64 - llut_start as i64 - 0x40 + old_offset as i64;
+        let min_new = lut_start_corr as i64 - llut_start as i64 - 0x40 + old_offset as i64;
         if min_new > new_offset as i64 {
             new_offset = min_new as usize;
         }
@@ -168,32 +166,30 @@ pub fn relocate_partition(
     let offset_diff = new_offset as i64 - old_offset as i64;
     me.write_u32(buf, ph_offset + 0x8, new_offset as u32)?;
 
-    if !mod_headers.is_empty()
-        && llut_start != 0 {
-            if me.read(buf, llut_start, 4)? == b"LLUT" {
-                let lut_offset =
-                    llut_start as i64 + offset_diff + 0x40 - lut_start_corr as i64;
-                me.write_u32(buf, llut_start + 0x0c, lut_offset as u32)?;
+    if !mod_headers.is_empty() && llut_start != 0 {
+        if me.read(buf, llut_start, 4)? == b"LLUT" {
+            let lut_offset = llut_start as i64 + offset_diff + 0x40 - lut_start_corr as i64;
+            me.write_u32(buf, llut_start + 0x0c, lut_offset as u32)?;
 
-                let old_huff = me.read_u32(buf, llut_start + 0x14)? as i64;
-                me.write_u32(buf, llut_start + 0x14, (old_huff + offset_diff) as u32)?;
+            let old_huff = me.read_u32(buf, llut_start + 0x14)? as i64;
+            me.write_u32(buf, llut_start + 0x14, (old_huff + offset_diff) as u32)?;
 
-                let chunk_count = me.read_u32(buf, llut_start + 0x4)? as usize;
-                let mut chunks = me.read(buf, llut_start + 0x40, chunk_count * 4)?.to_vec();
-                let mut i = 0;
-                while i < chunk_count * 4 {
-                    if chunks[i + 3] != 0x80 {
-                        let val = u24_le(&chunks[i..i + 3], 0) as i64 + offset_diff;
-                        let le = (val as u32).to_le_bytes();
-                        chunks[i..i + 3].copy_from_slice(&le[0..3]);
-                    }
-                    i += 4;
+            let chunk_count = me.read_u32(buf, llut_start + 0x4)? as usize;
+            let mut chunks = me.read(buf, llut_start + 0x40, chunk_count * 4)?.to_vec();
+            let mut i = 0;
+            while i < chunk_count * 4 {
+                if chunks[i + 3] != 0x80 {
+                    let val = u24_le(&chunks[i..i + 3], 0) as i64 + offset_diff;
+                    let le = (val as u32).to_le_bytes();
+                    chunks[i..i + 3].copy_from_slice(&le[0..3]);
                 }
-                me.write(buf, llut_start + 0x40, &chunks)?;
-            } else {
-                return Err(Error::MissingLlutRelocate);
+                i += 4;
             }
+            me.write(buf, llut_start + 0x40, &chunks)?;
+        } else {
+            return Err(Error::MissingLlutRelocate);
         }
+    }
 
     let size = partition_size.min(me_len - old_offset);
     me.move_range(buf, old_offset, size, new_offset, 0xff)?;

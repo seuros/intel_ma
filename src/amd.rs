@@ -61,8 +61,9 @@ fn rom_size_for(len: usize) -> usize {
 }
 
 /// Fixed EFS offsets where AMD places the FET.
-const FET_FIXED_OFFSETS: [usize; 7] =
-    [0x20000, 0x820000, 0x920000, 0xc20000, 0xe20000, 0xf20000, 0xfa0000];
+const FET_FIXED_OFFSETS: [usize; 7] = [
+    0x20000, 0x820000, 0x920000, 0xc20000, 0xe20000, 0xf20000, 0xfa0000,
+];
 
 /// Locate the FET: try fixed offsets, else scan for `FF`/`00` padding followed by magic.
 fn find_fet(buf: &[u8]) -> Option<usize> {
@@ -126,9 +127,7 @@ fn parse_directory(buf: &[u8], offset: usize, rom_size: usize) -> Option<Directo
         // Real directories have >=1 entry inside the ROM with a plausible size.
         let sane = entries
             .iter()
-            .filter(|e| {
-                (e.location as usize) < rom_size && (e.size as usize) <= rom_size
-            })
+            .filter(|e| (e.location as usize) < rom_size && (e.size as usize) <= rom_size)
             .count();
         if sane == 0 {
             return None;

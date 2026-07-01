@@ -40,11 +40,51 @@ struct SbKey {
 
 /// Vendor Secure Boot key-material sections. PK = keys provisioned; dbx = revocation list.
 const SB_KEYS: &[SbKey] = &[
-    SbKey { label: "AMI PK", guid: guid(0xCC0F8A3F, 0x3DEA, 0x4376, [0x96, 0x79, 0x54, 0x26, 0xBA, 0x0A, 0x90, 0x7E]) },
-    SbKey { label: "AMI dbx", guid: guid(0x9D7A05E9, 0xF740, 0x44C3, [0x85, 0x8B, 0x75, 0x58, 0x6A, 0x8F, 0x9C, 0x8E]) },
-    SbKey { label: "Dell PK", guid: guid(0x2C37326C, 0x3FC1, 0x4B03, [0x97, 0xBE, 0x20, 0x71, 0xCC, 0x81, 0x9B, 0x46]) },
-    SbKey { label: "Dell dbx", guid: guid(0x83072A6C, 0x4399, 0x49FF, [0xAC, 0xFA, 0x34, 0xF0, 0x6C, 0x61, 0x8B, 0xC0]) },
-    SbKey { label: "HP PK", guid: guid(0x3C8C6AC6, 0x2F87, 0x494C, [0xB8, 0x43, 0x41, 0x06, 0x07, 0xD3, 0xAD, 0x3D]) },
+    SbKey {
+        label: "AMI PK",
+        guid: guid(
+            0xCC0F8A3F,
+            0x3DEA,
+            0x4376,
+            [0x96, 0x79, 0x54, 0x26, 0xBA, 0x0A, 0x90, 0x7E],
+        ),
+    },
+    SbKey {
+        label: "AMI dbx",
+        guid: guid(
+            0x9D7A05E9,
+            0xF740,
+            0x44C3,
+            [0x85, 0x8B, 0x75, 0x58, 0x6A, 0x8F, 0x9C, 0x8E],
+        ),
+    },
+    SbKey {
+        label: "Dell PK",
+        guid: guid(
+            0x2C37326C,
+            0x3FC1,
+            0x4B03,
+            [0x97, 0xBE, 0x20, 0x71, 0xCC, 0x81, 0x9B, 0x46],
+        ),
+    },
+    SbKey {
+        label: "Dell dbx",
+        guid: guid(
+            0x83072A6C,
+            0x4399,
+            0x49FF,
+            [0xAC, 0xFA, 0x34, 0xF0, 0x6C, 0x61, 0x8B, 0xC0],
+        ),
+    },
+    SbKey {
+        label: "HP PK",
+        guid: guid(
+            0x3C8C6AC6,
+            0x2F87,
+            0x494C,
+            [0xB8, 0x43, 0x41, 0x06, 0x07, 0xD3, 0xAD, 0x3D],
+        ),
+    },
 ];
 
 /// Read/write region bitmasks for one descriptor master.
@@ -95,8 +135,11 @@ impl LockReport {
                     EntryType::KeyManifest | EntryType::BootPolicyManifest
                 ) {
                     r.boot_guard = true;
-                    r.boot_guard_entries
-                        .push(format!("{} @ {:#x}", e.entry_type.name(), e.address));
+                    r.boot_guard_entries.push(format!(
+                        "{} @ {:#x}",
+                        e.entry_type.name(),
+                        e.address
+                    ));
                 }
             }
         }
@@ -117,9 +160,15 @@ impl LockReport {
             let rd = |o: usize| crate::bytes::u32_le(buf, o);
             let decode = |flmstr: u32| -> (u16, u16) {
                 if v2 {
-                    (((flmstr >> 8) & 0xfff) as u16, ((flmstr >> 20) & 0xfff) as u16)
+                    (
+                        ((flmstr >> 8) & 0xfff) as u16,
+                        ((flmstr >> 20) & 0xfff) as u16,
+                    )
                 } else {
-                    (((flmstr >> 16) & 0xff) as u16, ((flmstr >> 24) & 0xff) as u16)
+                    (
+                        ((flmstr >> 16) & 0xff) as u16,
+                        ((flmstr >> 24) & 0xff) as u16,
+                    )
                 }
             };
             let names = ["Host/BIOS", "ME", "GbE"];

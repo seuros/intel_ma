@@ -49,7 +49,11 @@ struct CleanArgs {
     output: Option<PathBuf>,
 
     /// Also set the MeAltDisable/HAP bit (requires a full dump).
-    #[arg(short = 'S', long = "soft-disable", conflicts_with = "soft_disable_only")]
+    #[arg(
+        short = 'S',
+        long = "soft-disable",
+        conflicts_with = "soft_disable_only"
+    )]
     soft_disable: bool,
 
     /// Only set the MeAltDisable/HAP bit (requires a full dump).
@@ -156,7 +160,11 @@ fn run_info(path: &Path, check: bool) -> intel_ma::Result<()> {
             .iter()
             .map(|o| format!("{:#x}", a.me.start + o))
             .collect();
-        println!("{} $FPT candidates: {}", a.fpt_candidates.len(), locs.join(", "));
+        println!(
+            "{} $FPT candidates: {}",
+            a.fpt_candidates.len(),
+            locs.join(", ")
+        );
     }
     if let Some(fpt) = &a.fpt {
         println!("Found FPT header at {:#x}", a.me.start + fpt.offset);
@@ -213,7 +221,14 @@ fn run_info(path: &Path, check: bool) -> intel_ma::Result<()> {
                     &buf,
                     ftpr.offset as usize + a.ftpr_mn2_offset,
                 )?;
-                println!("{}", if valid { lingo::DEED_VALID } else { lingo::DEED_INVALID });
+                println!(
+                    "{}",
+                    if valid {
+                        lingo::DEED_VALID
+                    } else {
+                        lingo::DEED_INVALID
+                    }
+                );
                 if !valid {
                     return Err(intel_ma::Error::InvalidSignature);
                 }
@@ -353,12 +368,16 @@ fn run_amd(path: &Path) -> intel_ma::Result<()> {
             };
             println!();
             if has(0x00) {
-                println!("🔒  AMD root of trust: AMD_PUBLIC_KEY present - PSP verifies the boot chain");
+                println!(
+                    "🔒  AMD root of trust: AMD_PUBLIC_KEY present - PSP verifies the boot chain"
+                );
             }
             if has(0x0b) {
                 println!("    SOFT_FUSE_CHAIN present - holds the PSP debug / disable soft-fuses");
             }
-            println!("    The PSP lives on-die and is fuse-enforced: it cannot be evicted, only read.");
+            println!(
+                "    The PSP lives on-die and is fuse-enforced: it cannot be evicted, only read."
+            );
         }
     }
     Ok(())
@@ -421,7 +440,9 @@ fn run_locks(path: &Path) -> intel_ma::Result<()> {
                     "                  ✓ fully unlocked - every region reflashable (coreboot / liberated)"
                 );
             } else if d.me_writes_bios {
-                println!("                  ⚠ ME can WRITE the BIOS region (clean -d removes this)");
+                println!(
+                    "                  ⚠ ME can WRITE the BIOS region (clean -d removes this)"
+                );
             }
         }
         None => println!("Descriptor      : none (BIOS-only image or no flash descriptor)"),
@@ -471,10 +492,25 @@ fn run_clean(args: CleanArgs) -> intel_ma::Result<()> {
         println!("{line}");
     }
 
-    write_extract(report.extracted_descriptor.as_ref(), args.extract_descriptor.as_ref(), "descriptor")?;
-    write_extract(report.extracted_me.as_ref(), args.extract_me.as_ref(), "ME image")?;
+    write_extract(
+        report.extracted_descriptor.as_ref(),
+        args.extract_descriptor.as_ref(),
+        "descriptor",
+    )?;
+    write_extract(
+        report.extracted_me.as_ref(),
+        args.extract_me.as_ref(),
+        "ME image",
+    )?;
     if let Some(valid) = report.signature_valid {
-        println!("{}", if valid { lingo::DEED_VALID } else { lingo::DEED_INVALID });
+        println!(
+            "{}",
+            if valid {
+                lingo::DEED_VALID
+            } else {
+                lingo::DEED_INVALID
+            }
+        );
     }
 
     let out = args.output.as_deref().unwrap_or(&args.file);

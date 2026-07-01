@@ -29,10 +29,18 @@ fn synthetic_me_image() -> Vec<u8> {
 
 #[test]
 fn flreg_roundtrip() {
-    for &(start, end) in &[(0x3000usize, 0x100000usize), (0x1000, 0x800000), (0, 0x1000)] {
+    for &(start, end) in &[
+        (0x3000usize, 0x100000usize),
+        (0x1000, 0x800000),
+        (0, 0x1000),
+    ] {
         let flreg = start_end_to_flreg(start, end);
         let (s, e) = flreg_to_start_end(flreg);
-        assert_eq!((s, e), (start, end), "flreg roundtrip for {start:#x}..{end:#x}");
+        assert_eq!(
+            (s, e),
+            (start, end),
+            "flreg roundtrip for {start:#x}..{end:#x}"
+        );
     }
 }
 

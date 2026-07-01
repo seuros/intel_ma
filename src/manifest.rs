@@ -13,11 +13,7 @@ pub struct Version(pub [u16; 4]);
 
 impl std::fmt::Display for Version {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}.{}.{}.{}",
-            self.0[0], self.0[1], self.0[2], self.0[3]
-        )
+        write!(f, "{}.{}.{}.{}", self.0[0], self.0[1], self.0[2], self.0[3])
     }
 }
 
@@ -25,7 +21,11 @@ impl std::fmt::Display for Version {
 /// Generation 1 uses `$MAN`; everything else uses `$MN2`.
 pub fn check_mn2_tag(me: &Region, buf: &[u8], offset: usize, generation: Option<u8>) -> Result<()> {
     let tag = me.read(buf, offset + 0x1c, 4)?;
-    let expected: &[u8; 4] = if generation == Some(1) { b"$MAN" } else { b"$MN2" };
+    let expected: &[u8; 4] = if generation == Some(1) {
+        b"$MAN"
+    } else {
+        b"$MN2"
+    };
     if tag == expected {
         Ok(())
     } else {

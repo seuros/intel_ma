@@ -84,12 +84,40 @@ pub struct DisableBit {
 /// Resolve the HAP/AltMeDisable strap for gen >= 2; `None` for gen 1.
 pub fn disable_bit(generation: u8) -> Option<DisableBit> {
     Some(match generation {
-        2 => DisableBit { strap_off: 0x28, bit: 7, name: "AltMeDisable bit in PCHSTRP10" },
-        3 => DisableBit { strap_off: 0x00, bit: 16, name: "HAP bit in PCHSTRP0" },
-        4 => DisableBit { strap_off: 0x70, bit: 16, name: "HAP bit in PCHSTRP28" },
-        5 => DisableBit { strap_off: 0x80, bit: 16, name: "HAP bit in PCHSTRP32" },
-        6 => DisableBit { strap_off: 0x7c, bit: 16, name: "HAP bit in PCHSTRP31" },
-        7 => DisableBit { strap_off: 0xdc, bit: 16, name: "HAP bit in PCHSTRP55" },
-        _ => DisableBit { strap_off: 0x00, bit: 16, name: "HAP bit in PCHSTRP0" },
+        2 => DisableBit {
+            strap_off: 0x28,
+            bit: 7,
+            name: "AltMeDisable bit in PCHSTRP10",
+        },
+        3 => DisableBit {
+            strap_off: 0x00,
+            bit: 16,
+            name: "HAP bit in PCHSTRP0",
+        },
+        4 => DisableBit {
+            strap_off: 0x70,
+            bit: 16,
+            name: "HAP bit in PCHSTRP28",
+        },
+        5 => DisableBit {
+            strap_off: 0x80,
+            bit: 16,
+            name: "HAP bit in PCHSTRP32",
+        },
+        6 => DisableBit {
+            strap_off: 0x7c,
+            bit: 16,
+            name: "HAP bit in PCHSTRP31",
+        },
+        7 => DisableBit {
+            strap_off: 0xdc,
+            bit: 16,
+            name: "HAP bit in PCHSTRP55",
+        },
+        _ => DisableBit {
+            strap_off: 0x00,
+            bit: 16,
+            name: "HAP bit in PCHSTRP0",
+        },
     })
 }

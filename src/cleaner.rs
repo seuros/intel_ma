@@ -126,8 +126,11 @@ pub fn analyze(buf: &[u8]) -> Result<Analysis> {
             .iter()
             .map(|o| format!("{:#x}", me.start + o))
             .collect();
-        a.warnings
-            .push(format!("{} $FPT candidates: {}", candidates.len(), locs.join(", ")));
+        a.warnings.push(format!(
+            "{} $FPT candidates: {}",
+            candidates.len(),
+            locs.join(", ")
+        ));
     }
 
     // Prefer the candidate holding an FTPR/CODE partition; else first parseable table.
@@ -238,7 +241,11 @@ fn resolve_manifest(me: &Region, buf: &[u8], a: &mut Analysis, ftpr: Ftpr) -> Re
 }
 
 /// Read the per-generation disable strap; returns `(name, is_set, abs_offset, bit)` for gen >= 2.
-fn read_disable_status(buf: &[u8], d: &Descriptor, generation: u8) -> Option<(String, bool, usize, u32)> {
+fn read_disable_status(
+    buf: &[u8],
+    d: &Descriptor,
+    generation: u8,
+) -> Option<(String, bool, usize, u32)> {
     let db = descriptor::disable_bit(generation)?;
     let abs = d.fpsba + db.strap_off;
     let strap = u32_le(buf, abs);
@@ -265,7 +272,9 @@ pub fn clean(buf: &mut Vec<u8>, opts: &Options) -> Result<Report> {
             || opts.soft_disable
             || opts.soft_disable_only)
     {
-        return Err(Error::RequiresFullDump { op: "-d/-D/-M/-S/-s" });
+        return Err(Error::RequiresFullDump {
+            op: "-d/-D/-M/-S/-s",
+        });
     }
     if opts.soft_disable_only && (opts.relocate || opts.truncate) {
         return Err(Error::BadOptions("-s can't be used with -r or -t".into()));
@@ -286,19 +295,27 @@ pub fn clean(buf: &mut Vec<u8>, opts: &Options) -> Result<Report> {
         match generation {
             Some(1) => {
                 for (ba, name) in [(d.fisba, "ICHSTRP0"), (d.fmsba, "MCHSTRP0")] {
-                    let strap =
-                        u32_le(buf, ba);
+                    let strap = u32_le(buf, ba);
                     if strap & 1 != 0 {
                         logln!(report.log, "The meDisable bit in {} is SET", name);
                     } else {
-                        logln!(report.log, "The meDisable bit in {} is NOT SET, setting it now...", name);
+                        logln!(
+                            report.log,
+                            "The meDisable bit in {} is NOT SET, setting it now...",
+                            name
+                        );
                         buf[ba..ba + 4].copy_from_slice(&(strap | 1).to_le_bytes());
                     }
                 }
             }
             Some(g) => {
                 if let Some((name, set, _, _)) = read_disable_status(buf, d, g) {
-                    logln!(report.log, "The {} is {}", name, if set { "SET" } else { "NOT SET" });
+                    logln!(
+                        report.log,
+                        "The {} is {}",
+                        name,
+                        if set { "SET" } else { "NOT SET" }
+                    );
                 }
             }
             None => {}
@@ -306,16 +323,21 @@ pub fn clean(buf: &mut Vec<u8>, opts: &Options) -> Result<Report> {
     }
 
     // Generation 1: wipe and disable the ME region
-    if generation == Some(1) && !me.is_empty()
-        && let Some(d) = &d {
-            logln!(report.log, "Disabling the ME region...");
-            buf[d.frba + 0x8..d.frba + 0xc].copy_from_slice(&0x1fffu32.to_le_bytes());
-            logln!(report.log, "Wiping the ME region...");
-            me.fill_all(buf, 0xff)?;
-        }
+    if generation == Some(1)
+        && !me.is_empty()
+        && let Some(d) = &d
+    {
+        logln!(report.log, "Disabling the ME region...");
+        buf[d.frba + 0x8..d.frba + 0xc].copy_from_slice(&0x1fffu32.to_le_bytes());
+        logln!(report.log, "Wiping the ME region...");
+        me.fill_all(buf, 0xff)?;
+    }
 
     if me.is_empty() {
-        logln!(report.log, "The ME region in this image has already been disabled");
+        logln!(
+            report.log,
+            "The ME region in this image has already been disabled"
+        );
     }
 
     let (fpt, ftpr) = match (&a.fpt, &a.ftpr) {
@@ -335,90 +357,129 @@ pub fn clean(buf: &mut Vec<u8>, opts: &Options) -> Result<Report> {
         let num_modules = me.read_u32(buf, ftpr_offset + 0x20)? as usize;
         let probe_off = ftpr_offset + 0x290 + (num_modules + 1) * 0x60;
         if let Ok(data) = me.read(buf, probe_off, 0xc)
-            && &data[0x0..0x4] == b"$SKU" && data[0x8..0xc] == [0, 0, 0, 0] {
-                logln!(report.log, "ME 6 Ignition firmware detected, removing everything...");
-                me.fill_all(buf, 0xff)?;
-                me6_ignition = true;
-            }
+            && &data[0x0..0x4] == b"$SKU"
+            && data[0x8..0xc] == [0, 0, 0, 0]
+        {
+            logln!(
+                report.log,
+                "ME 6 Ignition firmware detected, removing everything..."
+            );
+            me.fill_all(buf, 0xff)?;
+            me6_ignition = true;
+        }
     }
 
     if generation != Some(1) {
         if !opts.soft_disable_only && !me6_ignition {
             if generation.map(|g| g >= 4).unwrap_or(false) {
-                logln!(report.log, "Module removal is not currently supported on IFWI firmware.");
+                logln!(
+                    report.log,
+                    "Module removal is not currently supported on IFWI firmware."
+                );
             } else {
                 let end_addr = remove_partitions_and_modules(
-                    buf, &me, fpt, generation, variant, version, me_len, ftpr_offset, ftpr_length, opts,
-                    &mut ftpr_offset, &mut report,
+                    buf,
+                    &me,
+                    fpt,
+                    generation,
+                    variant,
+                    version,
+                    me_len,
+                    ftpr_offset,
+                    ftpr_length,
+                    opts,
+                    &mut ftpr_offset,
+                    &mut report,
                 )?;
                 report.end_addr = end_addr;
 
                 if let Some(mut end_addr) = end_addr
-                    && end_addr > 0 {
-                        end_addr = (end_addr / BLOCK + 1) * BLOCK + SPARED_BLOCKS * BLOCK;
-                        report.end_addr = Some(end_addr);
-                        logln!(report.log, "The ME minimum size should be {0} bytes ({0:#x} bytes)", end_addr);
+                    && end_addr > 0
+                {
+                    end_addr = (end_addr / BLOCK + 1) * BLOCK + SPARED_BLOCKS * BLOCK;
+                    report.end_addr = Some(end_addr);
+                    logln!(
+                        report.log,
+                        "The ME minimum size should be {0} bytes ({0:#x} bytes)",
+                        end_addr
+                    );
 
-                        if me.start > 0 {
-                            logln!(report.log,
-                                "The ME region can be reduced up to:\n {:08x}:{:08x} me",
-                                me.start, me.start + end_addr - 1);
-                        } else if opts.truncate {
-                            logln!(report.log, "Truncating file at {:#x}...", end_addr);
-                            buf.truncate(end_addr);
-                            report.truncated_to = Some(end_addr);
-                        }
+                    if me.start > 0 {
+                        logln!(
+                            report.log,
+                            "The ME region can be reduced up to:\n {:08x}:{:08x} me",
+                            me.start,
+                            me.start + end_addr - 1
+                        );
+                    } else if opts.truncate {
+                        logln!(report.log, "Truncating file at {:#x}...", end_addr);
+                        buf.truncate(end_addr);
+                        report.truncated_to = Some(end_addr);
                     }
+                }
             }
         }
 
         // Soft disable (set HAP / AltMeDisable)
-        if (opts.soft_disable || opts.soft_disable_only) && generation.is_some()
+        if (opts.soft_disable || opts.soft_disable_only)
+            && generation.is_some()
             && let Some(d) = &d
-                && let Some((name, _, abs, bit)) = read_disable_status(buf, d, generation.unwrap()) {
-                    logln!(report.log, "Setting the {} to disable Intel ME...", name);
-                    let strap = u32_le(buf, abs);
-                    buf[abs..abs + 4].copy_from_slice(&(strap | (1 << bit)).to_le_bytes());
-                }
+            && let Some((name, _, abs, bit)) = read_disable_status(buf, d, generation.unwrap())
+        {
+            logln!(report.log, "Setting the {} to disable Intel ME...", name);
+            let strap = u32_le(buf, abs);
+            buf[abs..abs + 4].copy_from_slice(&(strap | (1 << bit)).to_le_bytes());
+        }
     }
 
     // Descriptor: drop ME R/W access to other regions
     if opts.descriptor
-        && let Some(d) = &d {
-            logln!(report.log, "Removing ME/TXE R/W access to the other flash regions...");
-            let flmstr2 = if generation == Some(3) {
-                0x0040_0500u32
-            } else {
-                let v = u32_le(buf, d.fmba + 0x4);
-                (v | 0x0404_0000) & 0x0404_ffff
-            };
-            buf[d.fmba + 0x4..d.fmba + 0x8].copy_from_slice(&flmstr2.to_le_bytes());
-        }
+        && let Some(d) = &d
+    {
+        logln!(
+            report.log,
+            "Removing ME/TXE R/W access to the other flash regions..."
+        );
+        let flmstr2 = if generation == Some(3) {
+            0x0040_0500u32
+        } else {
+            let v = u32_le(buf, d.fmba + 0x4);
+            (v | 0x0404_0000) & 0x0404_ffff
+        };
+        buf[d.fmba + 0x4..d.fmba + 0x8].copy_from_slice(&flmstr2.to_le_bytes());
+    }
 
     // Extraction
     if opts.extract_descriptor
-        && let Some(d) = &d {
-            let mut desc = d.fd.extract(buf, d.fd.len())?;
-            if opts.truncate
-                && let Some(end_addr) = report.end_addr {
-                    if d.bios.start == me.end {
-                        let flreg1 = descriptor::start_end_to_flreg(me.start + end_addr, d.bios.end);
-                        let frba = d.frba;
-                        desc[frba + 0x4..frba + 0x8].copy_from_slice(&flreg1.to_le_bytes());
-                        if generation != Some(1) {
-                            let flreg2 =
-                                descriptor::start_end_to_flreg(me.start, me.start + end_addr);
-                            desc[frba + 0x8..frba + 0xc].copy_from_slice(&flreg2.to_le_bytes());
-                        }
-                        logln!(report.log, "Modified extracted descriptor regions for truncation");
-                    } else {
-                        logln!(report.log,
-                            "WARNING: BIOS region start ({:#x}) != ME region end ({:#x}); descriptor regions not auto-adjusted",
-                            d.bios.start, me.end);
-                    }
+        && let Some(d) = &d
+    {
+        let mut desc = d.fd.extract(buf, d.fd.len())?;
+        if opts.truncate
+            && let Some(end_addr) = report.end_addr
+        {
+            if d.bios.start == me.end {
+                let flreg1 = descriptor::start_end_to_flreg(me.start + end_addr, d.bios.end);
+                let frba = d.frba;
+                desc[frba + 0x4..frba + 0x8].copy_from_slice(&flreg1.to_le_bytes());
+                if generation != Some(1) {
+                    let flreg2 = descriptor::start_end_to_flreg(me.start, me.start + end_addr);
+                    desc[frba + 0x8..frba + 0xc].copy_from_slice(&flreg2.to_le_bytes());
                 }
-            report.extracted_descriptor = Some(desc);
+                logln!(
+                    report.log,
+                    "Modified extracted descriptor regions for truncation"
+                );
+            } else {
+                logln!(
+                    report.log,
+                    "WARNING: BIOS region start ({:#x}) != ME region end ({:#x}); descriptor regions not auto-adjusted",
+                    d.bios.start,
+                    me.end
+                );
+            }
         }
+        report.extracted_descriptor = Some(desc);
+    }
 
     if generation != Some(1) && opts.extract_me {
         let size = if opts.truncate {
@@ -476,33 +537,45 @@ fn remove_partitions_and_modules(
         let name = p.name_str();
         let mut part_length = p.length as usize;
         // ME 6: last partition uses 0xffffffff as size.
-        if variant == "ME"
-            && version.0[0] == 6
-            && i == entries - 1
-            && p.length == 0xffff_ffff
-        {
+        if variant == "ME" && version.0[0] == 6 && i == entries - 1 && p.length == 0xffff_ffff {
             part_length = me_len - p.start as usize;
         }
         let part_start = p.start as usize;
         let part_end = part_start + part_length;
 
         if p.flags & 0x7f == 2 {
-            logln!(report.log, " {:<4} (NVRAM partition, no data): nothing to remove", name);
+            logln!(
+                report.log,
+                " {:<4} (NVRAM partition, no data): nothing to remove",
+                name
+            );
         } else if part_start == 0 || part_length == 0 || part_end > me_len {
             logln!(report.log, " {:<4} (no data here): nothing to remove", name);
         } else {
-            let keep = whitelist.contains(&name)
-                || (!blacklist.is_empty() && !blacklist.contains(&name));
+            let keep =
+                whitelist.contains(&name) || (!blacklist.is_empty() && !blacklist.contains(&name));
             if keep {
                 kept.extend_from_slice(&p.raw);
                 kept_names.push(name.clone());
                 if name != "FTPR" {
                     extra_part_end = extra_part_end.max(part_end);
                 }
-                logln!(report.log, " {:<4} (0x{:08x} - 0x{:08x}): NOT removed", name, part_start, part_end);
+                logln!(
+                    report.log,
+                    " {:<4} (0x{:08x} - 0x{:08x}): NOT removed",
+                    name,
+                    part_start,
+                    part_end
+                );
             } else {
                 me.fill_range(buf, part_start, part_end, 0xff)?;
-                logln!(report.log, " {:<4} (0x{:08x} - 0x{:08x}): removed", name, part_start, part_end);
+                logln!(
+                    report.log,
+                    " {:<4} (0x{:08x} - 0x{:08x}): removed",
+                    name,
+                    part_start,
+                    part_end
+                );
             }
         }
     }
@@ -510,7 +583,12 @@ fn remove_partitions_and_modules(
     logln!(report.log, "Removing partition entries in FPT...");
     me.write(buf, fpt_off + 0x20, &kept)?;
     me.write_u32(buf, fpt_off + 0x4, (kept.len() / 0x20) as u32)?;
-    me.fill_range(buf, fpt_off + 0x20 + kept.len(), fpt_off + 0x20 + entries * 0x20, 0xff)?;
+    me.fill_range(
+        buf,
+        fpt_off + 0x20 + kept.len(),
+        fpt_off + 0x20 + entries * 0x20,
+        0xff,
+    )?;
 
     // EFFS presence flag.
     let effs_default = (blacklist.is_empty() && !whitelist.iter().any(|w| w == "EFFS"))
@@ -543,13 +621,27 @@ fn remove_partitions_and_modules(
     logln!(report.log, "Reading FTPR modules list...");
     let res = if generation == Some(3) {
         modules::check_and_remove_modules_gen3(
-            me, buf, me_len, ftpr_offset, ftpr_length, MIN_FTPR_OFFSET, opts.relocate,
-            opts.keep_modules, ph_offset,
+            me,
+            buf,
+            me_len,
+            ftpr_offset,
+            ftpr_length,
+            MIN_FTPR_OFFSET,
+            opts.relocate,
+            opts.keep_modules,
+            ph_offset,
         )?
     } else {
         modules::check_and_remove_modules(
-            me, buf, me_len, ftpr_offset, ftpr_length, MIN_FTPR_OFFSET, opts.relocate,
-            opts.keep_modules, ph_offset,
+            me,
+            buf,
+            me_len,
+            ftpr_offset,
+            ftpr_length,
+            MIN_FTPR_OFFSET,
+            opts.relocate,
+            opts.keep_modules,
+            ph_offset,
         )?
     };
 

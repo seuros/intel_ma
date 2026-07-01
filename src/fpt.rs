@@ -20,12 +20,7 @@ pub struct Partition {
 impl Partition {
     /// Partition name as a printable string (NUL-trimmed, lossy on non-ascii).
     pub fn name_str(&self) -> String {
-        let trimmed: Vec<u8> = self
-            .name
-            .iter()
-            .copied()
-            .take_while(|&b| b != 0)
-            .collect();
+        let trimmed: Vec<u8> = self.name.iter().copied().take_while(|&b| b != 0).collect();
         match std::str::from_utf8(&trimmed) {
             Ok(s) => s.to_string(),
             Err(_) => "????".to_string(),
