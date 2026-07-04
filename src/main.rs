@@ -181,22 +181,26 @@ fn run_info(path: &Path, check: bool) -> intel_ma::Result<()> {
     }
     if let Some(fpt) = &a.fpt {
         println!("Found FPT header at {:#x}", a.me.start + fpt.offset);
-        println!("Found {} partition(s):", fpt.entries);
+        println!(
+            "Found {} partition(s):  (start = absolute file offset)",
+            fpt.entries
+        );
         for p in &fpt.partitions {
             println!(
                 "  {:<4} start={:#010x} len={:#010x} flags={:#010x}",
                 p.name_str(),
-                p.start,
+                a.me.start + p.start as usize,
                 p.length,
                 p.flags
             );
         }
     }
     if let Some(ftpr) = &a.ftpr {
+        let base = a.me.start + ftpr.offset as usize;
         println!(
             "FTPR partition: {:#x} - {:#x}{}",
-            ftpr.offset,
-            ftpr.offset as u64 + ftpr.length as u64,
+            base,
+            base + ftpr.length as usize,
             if ftpr.is_ifwi { " (IFWI)" } else { "" }
         );
     }
