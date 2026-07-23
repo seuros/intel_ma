@@ -38,8 +38,15 @@ Supported:
 - **GbE region** (`gbe`) - the Intel LAN NVM: MAC address, per-bank checksum and
   the active bank, and the LAN controller model (I217/I218/I219, 82577/82579).
   Accepts a full dump or a bare `flashregion_3_gbe.bin`
+- **Live probe** (`mei`, Linux only) - query the ME on the *running* machine
+  with no image and no root: the HECI PCI function, `/dev/mei0`, and the kernel's
+  `dev_state` / running `fw_ver` / `fw_status` from sysfs. macOS/FreeBSD build
+  fine and report "unsupported"
 
 ## Usage
+
+For a full walkthrough - detecting the ME on Linux, dumping the flash, auditing
+locks, and neutering the engine end-to-end - see [`docs/USAGE.md`](docs/USAGE.md).
 
 ```sh
 # Inspect an image
@@ -65,6 +72,9 @@ intel_ma bios firmware.bin --extract-roms ./roms
 
 # Read the GbE region: MAC, LAN controller, NVM banks
 intel_ma gbe firmware.bin
+
+# Probe the ME on THIS running machine (Linux only, no image, no root)
+intel_ma mei
 
 # Strip and neuter the ME. Writes in place unless -O is given.
 intel_ma clean firmware.bin -O cleaned.bin
@@ -92,13 +102,17 @@ intel_ma clean me.bin -w MFS -t -O me_small.bin
 | `-D, --extract-descriptor` | write the flash descriptor to a file |
 | `-M, --extract-me` | write the ME firmware to a file |
 
-## Build & test
+## Install
+
+Grab a prebuilt binary from the
+[releases page](https://github.com/seuros/intel_ma/releases), or install from
+crates.io:
 
 ```sh
-cargo build --release
-cargo test
-cargo clippy --all-targets
+cargo install intel_ma
 ```
+
+Runs on x86_64 Linux and FreeBSD/amd64.
 
 ## Library
 
