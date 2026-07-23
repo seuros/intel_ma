@@ -110,6 +110,10 @@ pub struct FlmstrReport {
 /// Locks determined for an image.
 #[derive(Debug, Default, Clone)]
 pub struct LockReport {
+    /// Boot Guard is *configured*: a Key Manifest / Boot Policy is present in
+    /// the FIT. This is NOT the same as *enforced* - enforcement is decided by
+    /// the PCH fuses (FPFs), which are not in the SPI image and cannot be read
+    /// from a dump.
     pub boot_guard: bool,
     pub boot_guard_entries: Vec<String>,
     pub bios_guard_pfat: bool,
@@ -192,7 +196,9 @@ impl LockReport {
         r
     }
 
-    /// True if any enforcement lock (Boot Guard / BIOS Guard / Secure Boot) is present.
+    /// True if any lock mechanism is *configured* in the image (Boot Guard
+    /// manifests / BIOS Guard PFAT / Secure Boot keys). Configured, not proven
+    /// enforced - see the `boot_guard` field note.
     pub fn any_enforcement(&self) -> bool {
         self.boot_guard || self.bios_guard_pfat || !self.secure_boot_keys.is_empty()
     }

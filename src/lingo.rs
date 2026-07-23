@@ -30,9 +30,14 @@ pub fn squatter_line(version: &str, generation: u8) -> String {
 }
 
 /// Boot Guard headline; `cmd_hint` adds a pointer to the `fit` subcommand.
+///
+/// Deliberately says CONFIGURED, not ENFORCED: all we can see from a flash
+/// image is that the Key Manifest / Boot Policy are present. Real enforcement
+/// is decided by the PCH fuses (FPFs), which are burned at the factory and are
+/// not part of the SPI image - so a dump can never confirm it either way.
 pub fn vendor_lock(cmd_hint: bool) -> String {
     let mut s = String::from(
-        "🔒  THEY CHANGED THE LOCKS (Boot Guard)\n    \"This hardware is property of Intel Corporation, by the will of silicon.\"\n    The squatter nailed the doors shut: forcing your way in (flashing an unsigned image) may BRICK the board.",
+        "🔒  BOOT GUARD CONFIGURED (Key Manifest + Boot Policy present)\n    The board is set up for Boot Guard, but whether it is ENFORCED lives in the\n    PCH fuses (FPFs) - burned at the factory, not in this image, unreadable from a\n    dump. On OEM hardware assume it is fused ON. If it is, flashing an unsigned or\n    modified BIOS may BRICK the board. A flash cannot turn this on or off.",
     );
     if cmd_hint {
         s.push_str("\n    Case the locks first:  intel_ma fit <image>");
@@ -40,7 +45,7 @@ pub fn vendor_lock(cmd_hint: bool) -> String {
     s
 }
 
-pub const NO_VENDOR_LOCK: &str = "Doors are open - Boot Guard not enforced (no lock in the FIT)";
+pub const NO_VENDOR_LOCK: &str = "No Boot Guard manifests in the FIT - this image is not configured for it (fuse state still unknown)";
 
 pub const DEED_VALID: &str = "Their forged deed is genuine Intel paper - FTPR RSA signature VALID";
 pub const DEED_INVALID: &str = "Even the forgery is botched - FTPR RSA signature INVALID!!";

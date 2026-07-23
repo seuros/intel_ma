@@ -532,12 +532,19 @@ fn run_locks(path: &Path) -> intel_ma::Result<()> {
     println!("== Locks on this house ==");
 
     if report.boot_guard {
-        println!("Boot Guard      : ENFORCED (vendor signs the firmware)");
+        println!("Boot Guard      : CONFIGURED (Key Manifest / Boot Policy present in FIT)");
         for e in &report.boot_guard_entries {
             println!("                  - {e}");
         }
+        println!("                  note: real enforcement is set in the PCH fuses (FPFs) at the");
+        println!(
+            "                        factory - not in this image, unreadable from a dump. On OEM"
+        );
+        println!("                        boards assume fused ON; flashing cannot change it.");
     } else {
-        println!("Boot Guard      : open (no Key Manifest / Boot Policy in FIT)");
+        println!(
+            "Boot Guard      : no manifests in FIT (image not configured; fuse state unknown)"
+        );
     }
 
     println!(
