@@ -11,6 +11,7 @@ pub mod fpt;
 pub mod gbe;
 pub mod locks;
 pub mod manifest;
+pub mod mei;
 pub mod modules;
 pub mod pubkeys;
 pub mod region;

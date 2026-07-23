@@ -33,6 +33,8 @@ enum Command {
     Bios(BiosArgs),
     #[command(about = lingo::GBE_ABOUT)]
     Gbe(InfoArgs),
+    #[command(about = lingo::MEI_ABOUT)]
+    Mei,
 }
 
 #[derive(Args)]
@@ -116,6 +118,7 @@ fn main() -> ExitCode {
         Command::Amd(a) => run_amd(&a.file),
         Command::Bios(a) => run_bios(&a.file, a.extract_roms.as_deref()),
         Command::Gbe(a) => run_gbe(&a.file),
+        Command::Mei => run_mei(),
     };
 
     match result {
@@ -450,6 +453,65 @@ fn fmt_mac(mac: &[u8; 6]) -> String {
         .map(|b| format!("{b:02x}"))
         .collect::<Vec<_>>()
         .join(":")
+}
+
+/// Live probe of the running machine's Management Engine (Linux only).
+fn run_mei() -> intel_ma::Result<()> {
+    let p = intel_ma::mei::probe()?;
+
+    if p.pci.is_empty() {
+        println!("PCI            : no Intel HECI/MEI function found on the bus");
+        println!("                 (no Intel ME on this machine, or PCI sysfs unavailable)");
+    } else {
+        for (i, d) in p.pci.iter().enumerate() {
+            let label = if i == 0 { "PCI" } else { "" };
+            println!(
+                "{label:<15}: {} {:04x}:{:04x} (class {:06x}) - HECI/MEI",
+                d.address, d.vendor, d.device, d.class
+            );
+        }
+    }
+
+    println!(
+        "/dev/mei0      : {}",
+        if p.dev_node {
+            "present (mei driver bound, engine answering)"
+        } else {
+            "absent (no mei driver bound - engine may still be present)"
+        }
+    );
+
+    match &p.dev_state {
+        Some(s) => println!("dev_state      : {s}"),
+        None => println!("dev_state      : unknown (/sys/class/mei/mei0 not present)"),
+    }
+
+    if p.fw_ver.is_empty() {
+        println!("fw_ver         : unavailable (driver not bound or older kernel)");
+    } else {
+        const BLOCKS: [&str; 3] = ["code", "recovery", "FITC"];
+        for (i, v) in p.fw_ver.iter().enumerate() {
+            let block = BLOCKS.get(i).copied().unwrap_or("block");
+            let label = if i == 0 { "fw_ver" } else { "" };
+            println!("{label:<15}: {v}  [{}]  ({})", v.family(), block);
+        }
+    }
+
+    if !p.fw_status.is_empty() {
+        let regs = p
+            .fw_status
+            .iter()
+            .map(|r| format!("{r:08x}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        println!("fw_status      : {regs}");
+    }
+
+    if p.pci.is_empty() && !p.dev_node && p.fw_ver.is_empty() {
+        println!();
+        println!("No sign of an Intel ME on this machine.");
+    }
+    Ok(())
 }
 
 fn run_amd(path: &Path) -> intel_ma::Result<()> {

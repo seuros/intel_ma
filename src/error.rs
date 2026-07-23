@@ -46,6 +46,9 @@ pub enum Error {
     #[error("invalid option combination: {0}")]
     BadOptions(String),
 
+    #[error("{0}")]
+    Unsupported(&'static str),
+
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }

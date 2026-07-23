@@ -17,6 +17,8 @@ pub const BIOS_ABOUT: &str =
     "Search the BIOS region (UEFI volumes, modules; decompresses EFI/Tiano sections)";
 pub const GBE_ABOUT: &str =
     "Read the mailbox on the wall (GbE region: MAC, LAN controller, NVM banks)";
+pub const MEI_ABOUT: &str =
+    "Knock on the door of the live machine (probe the running ME over PCI/MEI - Linux only)";
 
 pub const FULL_IMAGE: &str = "The whole house - full SPI dump (flash descriptor present)";
 pub const ME_IMAGE: &str = "Just the room they barricaded - ME/TXE region image";
